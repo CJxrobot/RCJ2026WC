@@ -2,20 +2,16 @@
 ## TO DO List
 - Software Architecture
 
-- Motor Control API
-
-- Top Maix Cam API
-
-- Front Maix Cam API
-
-- Vector Motion API
-
-- Ball Sensor API
-
-- Line Sensor API
-
-- Dribbler API
-
-- Kicker API
-
-- BLE API
+- Sub Core
+  - Motor Control API
+  - Line Sensor Mux API
+  - Vector Motion API
+- Main Core
+  - Top Maix Cam API
+  - Front Maix Cam API
+  - Ball Sensor API
+  - Dribbler API
+  - Kicker API
+- ESP32(Dual Core)
+  - BLE API
+  - Ball Sensor API
