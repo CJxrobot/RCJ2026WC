@@ -36,16 +36,11 @@
 #define US_FILTER_ALPHA 0.35f
 #define US_INVALID_LIMIT 3
 
+#define COM_O1_PIN 37
+#define COM_O2_PIN 36
+
 // --- 1. Blueprints (Struct Definitions) ---
-// We define these so every file knows the "shape" of the data.
-struct CamData {
-    uint16_t ball_x = 65535; uint16_t ball_y = 65535;
-    uint16_t ball_w = 65535; uint16_t ball_h = 65535;
-    bool ball_valid = false;
-    uint16_t goal_x = 65535; uint16_t goal_y = 65535;
-    uint16_t goal_w = 65535; uint16_t goal_h = 65535;
-    bool goal_valid = false;
-};
+struct TopMaixData {int16_t x = 0;int16_t y = 0;uint8_t status = 0;bool valid = false;bool ball_found = false;uint16_t ball_angle = 0xFFFF;uint8_t ball_dist = 0;};
 
 struct BallData {
     uint16_t dist = 65535; uint16_t angle = 65535;
@@ -57,27 +52,41 @@ struct USSensor {
     uint16_t dist_r = 0; uint16_t dist_f = 0;
 };
 
-struct RobotMovement {
-    float vx = 0.0f; float vy = 0.0f; float rot_v = 0.0f;
+
+// 1. Define a strongly-typed enum (Scoped Enum)
+// Specifying ': int8_t' forces it to occupy exactly 1 byte, 
+// perfectly replacing your original 'int8_t role' memory size.
+enum class RobotRole : int8_t {
+    DEFAULT = 0,
+    DEFENSE = 1,
+    OFFENSE = 2
+};
+
+enum class RobotState : uint8_t { STATE_READY, STATE_CALIBRATING, STATE_SAVING };
+
+// 2. Robot state structure
+struct RobotMonitor {
+    RobotRole role = RobotRole::DEFAULT; // Uses the custom enum type with a default value
+    RobotState currentState = RobotState::STATE_READY;
+    int8_t pos_x = 0; 
+    int8_t pos_y = 0;
+    bool has_possession = false;
+    float vx = 0.0f; 
+    float vy = 0.0f; 
+    float rot_v = 0.0f;
     uint16_t heading = 0; // Target heading in degrees
+    //for teammate data:
+    uint8_t ball_dist = 0; // 0-15 (4 bits)
+    uint8_t ball_angle = 0; // 0-255 (8 bits)
 };
-
-struct BT_PacketData {
-    float posX;
-    float posY;
-    float ballDistance;
-    float ballAngle;
-    bool hasPossession;
-    int currentRole; // Sent so the teammate knows what you picked
-};
-
 
 // --- 3. External Variables ---
 // These tell the compiler "The actual memory for these is in main.cpp"
-extern CamData camData;
+extern TopMaixData topmaixData;
 extern BallData ballData;
 extern USSensor usData;
-extern RobotMovement robotMovement;
+extern RobotMonitor robotMonitor;
+extern RobotMonitor teammateMonitor;
 extern Adafruit_SSD1306 display;
 
 
@@ -85,11 +94,15 @@ extern Adafruit_SSD1306 display;
 void main_core_init();
 void drawMessage(const char* msg);
 void kicker_control(bool kick);
-bool UI_Interface();
-void sendMotor(float vx, float vy, float rot_v, int heading);
-void sendMotorAndGetSensors(float vx, float vy, float rot_v, int heading);
+void readTopMaix();
+void roleSwitchControl();
 void get_ball_sensor();
-void ATTACK_send_data_to_esp();
-void DEFENSE_read_data_from_esp();
-void DEFENSE_send_role_switch();
+void parseSerial6Stream();
+void listenToEspCommands();
+void sendRoleSwitchCommand();
+void getRoleSwitchCommand();
+void update_all_sensor();
+void sendMotor(float vx, float vy, float rot_v, int heading);
+void stopMotors();
+bool UI_Interface();
 #endif
