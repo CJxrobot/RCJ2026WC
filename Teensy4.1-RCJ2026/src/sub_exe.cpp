@@ -2,7 +2,7 @@
 uint8_t role = 0; // 0: default, 1: defense, 2: offense
 void setup() {
     sub_core_init();
-    digitalWrite(LED_BUILTIN, HIGH); // Indicate setup complete
+    digitalWrite(LED_BUILTIN, HIGH); // Indicate setup incomplete
     while(1){
         Serial.println("Waiting for MainCore...");
         if(Serial8.available()){
