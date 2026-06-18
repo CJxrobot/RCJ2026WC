@@ -5,5 +5,7 @@ void setup() {
 }
 
 void loop() {
-    get_ball_sensor();
+    parseESP32(); // Handle incoming ESP32 data asynchronously
+    triggerBallRequest(); // Non-blocking ball request
+    triggerTeammateRequest(); // Non-blocking teammate request
 }
