@@ -4,9 +4,9 @@
 
 - Sub Core
   - Motor Control API: Done
-  - Line Sensor Mux API: Tommy
-  - Vector Motion API: Tommy
-  - Gyro Sensor API: Tommy
+  - Line Sensor Mux API: Done
+  - Vector Motion API: Done
+  - Gyro Sensor API: Done
 - Main Core
   - Top Maix Cam API: Flash
   - Front Maix Cam API: Flash
