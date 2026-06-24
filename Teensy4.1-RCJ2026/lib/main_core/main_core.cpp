@@ -2,11 +2,19 @@
 
 
 // --- Sensor Data ---
+<<<<<<< HEAD
 TopMaixData topmaixData; // Maix Position Data (x, y, status, ball info)
+=======
+//TopMaixData topmaixData; // Maix Position Data (x, y, status, ball info)
+>>>>>>> 22e0647 (sync with defense)
 BallData ballData;
 USSensor usData;
 RobotMonitor robotMonitor;
 RobotMonitor teammateMonitor;
+<<<<<<< HEAD
+=======
+MaixPosData maixPosData;
+>>>>>>> 22e0647 (sync with defense)
 
 // Role Switching
 int8_t role = 0; // 0: default, 1: defense, 2: offense
@@ -38,14 +46,14 @@ void main_core_init() {
 
     Wire.begin();
     Wire.setClock(400000); // Fast I2C for OLED
-/*
+
     if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
         for(;;); // Lock if OLED fails
     }
 
     display.clearDisplay();
     display.setTextColor(SSD1306_WHITE);
-*/    
+    
     // Pin Setups
     pinMode(Charge_Pin, OUTPUT);
     pinMode(Kicker_Pin, OUTPUT);
@@ -67,10 +75,18 @@ void main_core_init() {
     pinMode(echoPins[i], INPUT);
     digitalWrite(trigPins[i], LOW);
     }
+<<<<<<< HEAD
+=======
+    /*
+>>>>>>> 22e0647 (sync with defense)
     attachInterrupt(digitalPinToInterrupt(ECHO_F), echoFrontISR, CHANGE);
     attachInterrupt(digitalPinToInterrupt(ECHO_R), echoRightISR, CHANGE);
     attachInterrupt(digitalPinToInterrupt(ECHO_B), echoBackISR,  CHANGE);
     attachInterrupt(digitalPinToInterrupt(ECHO_L), echoLeftISR,  CHANGE);
+<<<<<<< HEAD
+=======
+    */
+>>>>>>> 22e0647 (sync with defense)
 }
 
 void drawMessage(const char* msg) {
@@ -80,7 +96,27 @@ void drawMessage(const char* msg) {
     display.println(msg);
     display.display();
 }
-
+void ballsensor() {
+  uint8_t buffer[6];
+  Serial6.write(0xDD);
+  while(!Serial6.available());
+  Serial6.readBytes(buffer,6);
+  if(buffer[0] != 0xCC) return;
+  if (buffer[5] != 0xEE) return;
+  uint8_t found = buffer[1];
+  uint16_t angle = (uint16_t)buffer[2] | ((uint16_t)buffer[3] << 8);
+  uint8_t dist = buffer[4];
+  if (!found) {
+    robotMonitor.ball_valid = false;
+    robotMonitor.ball_angle = 65535; // Invalid angle
+    robotMonitor.ball_dist = 255; // Max distance
+    return;
+  }
+  Serial.printf("Ball Found! Angle: %d, Dist: %d\n", angle, dist);
+  robotMonitor.ball_valid = true;
+  robotMonitor.ball_angle = angle;
+  robotMonitor.ball_dist = dist;
+}
 void kicker_control(bool kick) {
     static uint32_t charge_start_time = 0;
     static bool is_charged = false;
@@ -121,8 +157,12 @@ void kicker_control(bool kick) {
     }
 }
 
+<<<<<<< HEAD
 
 void readTopMaix() {
+=======
+/*void readTopMaix() {
+>>>>>>> 22e0647 (sync with defense)
     uint8_t buffer[12];
     Serial3.write(0xDD);
     while(!Serial3.available());
@@ -143,6 +183,7 @@ void readTopMaix() {
     }
     else{
         topmaixData.valid = false;  // checksum error
+<<<<<<< HEAD
     }
 }
 
@@ -244,6 +285,136 @@ FASTRUN void parseSerial6Stream() {
     }
 }
 
+=======
+    }
+}*/
+
+void readMaix() {
+uint32_t start = micros();
+  uint8_t buffer[10];
+  Serial3.write(0xDD);
+  //while(!Serial3.available()){Serial.println("cam");};
+  Serial3.readBytes(buffer,10);
+  robotMonitor.main_valid = 0;
+
+  if(buffer[0] == 0xCC && buffer[9] == 0xEE){
+    uint8_t checksum = (buffer[1] + buffer[2] + buffer[3] + buffer[4]+ buffer[5]+ buffer[6]+ buffer[7]) & 0xFF;
+    if(checksum == buffer[8]){
+      //Serial.printf("duration: %ld\n", micros() - start);
+      robotMonitor.main_valid = true;
+      robotMonitor.pos_x = (int8_t)(uint8_t)buffer[1];
+      robotMonitor.pos_y = (int8_t)(uint8_t)buffer[2];
+      robotMonitor.pos_status = buffer[3];
+
+      //robotMonitor.ball_found = buffer[4];
+      //robotMonitor.ball_angle = (uint16_t)buffer[5] | ((uint16_t)buffer[6] << 8);
+      //robotMonitor.ball_dist = buffer[7];
+    }
+  }
+  else{
+    robotMonitor.main_valid = false;  // checksum error
+  }
+}
+
+void roleSwitchControl() {
+    if (robotMonitor.role == RobotRole::DEFENSE) {
+        // Defense-specific logic
+    } else if (robotMonitor.role == RobotRole::OFFENSE) {
+        // Offense-specific logic
+    }
+}
+
+// ==================================================================
+// SYSTEM DISPATCHERS (Fire-and-Forget Requests)
+// ==================================================================
+FASTRUN void triggerBallRequest() {
+    Serial6.write(0xDD); // Simply send the token and leave. No blocking wait!
+}
+
+FASTRUN void triggerTeammateRequest() {
+    Serial6.write(0xBD); // Simply send the token and leave. No blocking wait!
+}
+
+// ==================================================================
+// THE UNIFIED STREAM PARSER (Zero Collisions, Maximum Speed)
+// ==================================================================
+FASTRUN void parseSerial6Stream() {
+    // Process all bytes currently sitting in the hardware FIFO buffer
+    while (Serial6.available() >= 1) {
+        uint8_t header = Serial6.peek(); // Inspect the first byte without extraction
+
+        switch (header) {
+            
+            // CASE 1: Ball Sensor Packet (Expects 5 bytes: 0xDC ... 0xEE)
+            case 0xDC: {
+                if (Serial6.available() < 5) return; // Wait until full packet arrives in later loops
+                uint8_t buf[5];
+                Serial6.readBytes(buf, 5);
+                
+                if (buf[4] == 0xEE) {
+                    robotMonitor.ball_angle = (uint16_t)buf[1] | ((uint16_t)buf[2] << 8);
+                    robotMonitor.ball_valid = true;
+                }
+                break;
+            }
+
+            // CASE 2: Teammate Data Packet (Expects 5 bytes: 0xCE ... 0xEE)
+            case 0xCE: {
+                if (Serial6.available() < 5) return; 
+                uint8_t buf[5];
+                Serial6.readBytes(buf, 5);
+                
+                if (buf[4] == 0xEE) {
+                    teammateMonitor.pos_x = buf[1];
+                    teammateMonitor.pos_y = buf[2];
+                    teammateMonitor.ball_angle = ((buf[3] >> 6) & 0x03) * 90; 
+                    teammateMonitor.ball_dist = (buf[3] >> 2) & 0x0F; 
+                    teammateMonitor.has_possession = (buf[3] >> 1) & 0x01;
+                }
+                break;
+            }
+
+            // CASE 3: ESP32 Async Telemetry Request (Expects 1 byte: 0xAB)
+            case 0xAB: {
+                Serial6.read(); // Consume the token
+                Serial6.write(0xAF); 
+                Serial6.write(robotMonitor.pos_x);
+                Serial6.write(robotMonitor.pos_y);
+                Serial6.write(robotMonitor.has_possession ? 1 : 0);
+                Serial6.write(0xEE); 
+                break;
+            }
+
+            // CASE 4: ESP32 Passive Role Switch Notification (Expects 2 bytes: 0xAF + Role)
+            case 0xAF: {
+                if (Serial6.available() < 2) return; 
+                Serial6.read(); // Consume header
+                uint8_t roleByte = Serial6.read();
+                
+                if (roleByte == 0x0F) robotMonitor.role = RobotRole::OFFENSE;
+                else if (roleByte == 0x0D) robotMonitor.role = RobotRole::DEFENSE;
+                break;
+            }
+
+            // CASE 5: ESP32 Role Switch Handshake Command (Expects 1 byte: 0xBC)
+            case 0xBC: {
+                Serial6.read(); // Consume token
+                Serial6.write(0xAF); 
+                Serial6.write(robotMonitor.role == RobotRole::OFFENSE ? 0x0F : 0x0D);
+                Serial6.write(0xEE); 
+                break;
+            }
+
+            // FALLBACK: Garbage handling protection
+            default: {
+                Serial6.read(); // Stream mismatch, discard 1 byte to realign the parser
+                break;
+            }
+        }
+    }
+}
+
+>>>>>>> 22e0647 (sync with defense)
 void update_all_sensor(){
     get_ball_sensor();
 }
@@ -258,6 +429,25 @@ void sendMotor(float vx, float vy, float rot_v, int target_heading) {
     // Scale down by 10 to fit 0-360 into a single byte (0-36)
     data[4] = (int8_t)(target_heading / 10);
     data[5] = PROTOCAL_END;
+    Serial8.write(data, sizeof(data));
+}
+
+void stopMotors() {
+    sendMotor(0.0f, 0.0f, 0.0f, 90); // Send zero velocities to stop
+}
+
+
+void sendMaincoreData() {
+    uint8_t data[9];
+    data[0] = PROTOCAL_HEADER;
+    data[1] = robotMonitor.pos_x;
+    data[2] = robotMonitor.pos_y;
+    data[3] = robotMonitor.ball_valid ? 1 : 0;
+    data[4] = robotMonitor.ball_angle;
+    data[5] = robotMonitor.ball_angle>>8; // High byte
+    data[6] = robotMonitor.ball_dist;
+    data[7] = robotMonitor.ball_dist>>8; // High byte
+    data[8] = PROTOCAL_END;
     Serial8.write(data, sizeof(data));
 }
 
@@ -285,10 +475,6 @@ bool UI_Interface(){
                 display.setCursor(0, 0);
                 display.printf("ball dist: %d\n", ballData.dist);
                 display.printf("ball angle: %d\n",ballData.angle);
-                display.printf("us f: %d\n", usData.dist_f);
-                display.printf("us l: %d\n", usData.dist_l);
-                display.printf("us r: %d\n", usData.dist_r);
-                display.printf("us b: %d\n", usData.dist_b);
                 display.display();
                 lastDisplayTime = millis();
             }
@@ -327,7 +513,16 @@ bool UI_Interface(){
     }
     return true;
 }
+/*
+void triggerUS(uint8_t i) {
+  digitalWrite(trigPins[i], LOW);
+  delayMicroseconds(2);
+  digitalWrite(trigPins[i], HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPins[i], LOW);
+}
 
+<<<<<<< HEAD
 void triggerUS(uint8_t i) {
   digitalWrite(trigPins[i], LOW);
   delayMicroseconds(2);
@@ -337,12 +532,18 @@ void triggerUS(uint8_t i) {
 }
 
 void updateUS() {
+=======
+void updateUS() {
+    static uint32_t last_trigger_time = 0;
+    uint8_t current_us = 0;
+>>>>>>> 22e0647 (sync with defense)
   if (millis() - last_trigger_time >= 50) {
     last_trigger_time = millis();
     current_us = (current_us + 1) % US_COUNT;
     echo_done[current_us] = false;
     triggerUS(current_us);
   }
+<<<<<<< HEAD
 
   for (uint8_t i = 0; i < US_COUNT; i++) {
     if (!echo_done[i]) continue;
@@ -362,4 +563,26 @@ void updateUS() {
   }
 }
 
+=======
+>>>>>>> 22e0647 (sync with defense)
 
+  for (uint8_t i = 0; i < US_COUNT; i++) {
+    if (!echo_done[i]) continue;
+    noInterrupts();
+    uint32_t dur = echo_duration[i];
+    echo_done[i] = false;
+    interrupts();
+    
+    if (dur > 100 && dur < 12000) {
+      float raw = dur * 0.0343f / 2.0f;
+      us_invalid_count[i] = 0;
+      us_dist_cm[i] = (us_dist_cm[i] < US_INVALID_DISTANCE) ? us_dist_cm[i] * (1.0f - US_FILTER_ALPHA) + raw * US_FILTER_ALPHA: raw;
+    } 
+    else {
+      if (us_invalid_count[i] < US_INVALID_LIMIT) us_invalid_count[i]++;
+      if (us_invalid_count[i] >= US_INVALID_LIMIT) us_dist_cm[i] = US_INVALID_DISTANCE;
+    }
+  }
+}
+
+*/
