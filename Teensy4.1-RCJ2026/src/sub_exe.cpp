@@ -1,5 +1,5 @@
 #include "sub_core.h"
-#include "sub_core.h"
+
 
 #define DtoR_const 0.0174529f
 

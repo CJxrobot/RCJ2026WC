@@ -3,15 +3,9 @@
 // 1. Define the actual memory for these variables here
 LineData lineData; 
 GyroData gyroData;       
-RobotStatus robot;
 MainCoreCommand mainCommand;
-GoalData goalData;
-USSensor usData;
 RobotMonitor subMonitor;
-
-// --- Sensor Data ---
-BallData ballData;
-Position RobotPos;
+RobotStatus robot;        // Added to match Vector_Motion usage
 
 uint16_t avg_ls[34];
 
@@ -65,7 +59,7 @@ int readMux(int ch, int sig) {
     return 4095;
 }
 void readMaincoreData() {
-    const int PACKET_SIZE = 9;
+    const int PACKET_SIZE = 10; // Header + 8 bytes of data + End byte
     uint8_t buffer[PACKET_SIZE];
     while (Serial8.available() >= PACKET_SIZE) {
         if (Serial8.peek() != PROTOCAL_HEADER) {
@@ -79,6 +73,7 @@ void readMaincoreData() {
           subMonitor.ball_valid = buffer[3] != 0;
           subMonitor.ball_angle = (buffer[5] << 8) | buffer[4];
           subMonitor.ball_dist = (buffer[7] << 8) | buffer[6];
+          subMonitor.role = buffer[8];
         }
     }
 }

@@ -2,11 +2,26 @@
 
 
 // --- Sensor Data ---
-//TopMaixData topmaixData; // Maix Position Data (x, y, status, ball info)
-USSensor usData;
+// main_core.cpp
+USData usData = {
+  .pos_x_f          = 0.0f,
+  .pos_y_f          = 0.0f,
+  .dist_cm          = { US_INVALID_DIST, US_INVALID_DIST, US_INVALID_DIST, US_INVALID_DIST },
+  .invalid_count    = {0},
+  .coord_x          = US_INVALID_DIST,
+  .coord_y          = US_INVALID_DIST,
+  .current          = US_COUNT - 1,
+  .last_trigger_time = 0,
+  .last_display_time = 0,
+};
 TopMaixPosData topmaixPosData;
 RobotMonitor robotMonitor;
 RobotMonitor teammateMonitor;
+
+// main_core.cpp — 這裡才是唯一定義
+volatile uint32_t echo_start[US_COUNT]    = {0};
+volatile uint32_t echo_duration[US_COUNT] = {0};
+volatile bool     echo_done[US_COUNT]     = {false};
 
 // --- OLED OBJECT ---
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
@@ -48,17 +63,18 @@ void main_core_init() {
 
     pinMode(COM_O1_PIN, INPUT);
     pinMode(COM_O2_PIN, INPUT);
+
     for (uint8_t i = 0; i < US_COUNT; i++) {
-    pinMode(trigPins[i], OUTPUT);
-    pinMode(echoPins[i], INPUT);
-    digitalWrite(trigPins[i], LOW);
+        pinMode(trigPins[i], OUTPUT);
+        pinMode(echoPins[i], INPUT);
+        digitalWrite(trigPins[i], LOW);
     }
-    /*
-    attachInterrupt(digitalPinToInterrupt(ECHO_F), echoFrontISR, CHANGE);
-    attachInterrupt(digitalPinToInterrupt(ECHO_R), echoRightISR, CHANGE);
-    attachInterrupt(digitalPinToInterrupt(ECHO_B), echoBackISR,  CHANGE);
-    attachInterrupt(digitalPinToInterrupt(ECHO_L), echoLeftISR,  CHANGE);
-    */
+
+    attachInterrupt(digitalPinToInterrupt(ECHO_F), echoISR<US_FRONT>, CHANGE);
+    attachInterrupt(digitalPinToInterrupt(ECHO_R), echoISR<US_RIGHT>, CHANGE);
+    attachInterrupt(digitalPinToInterrupt(ECHO_B), echoISR<US_BACK>,  CHANGE);
+    attachInterrupt(digitalPinToInterrupt(ECHO_L), echoISR<US_LEFT>,  CHANGE);
+
 }
 
 void drawMessage(const char* msg) {
@@ -167,6 +183,7 @@ void roleSwitchControl() {
 void update_all_sensor(){
     ballsensor();
     readTopMaix();
+    updateUS();
 }
 
 void sensor_fusion() {
@@ -180,6 +197,10 @@ void sensor_fusion() {
         robotMonitor.ball_angle = 65535; // Invalid angle
         robotMonitor.ball_dist = 255; // Max distance
     }
+
+    // Position Sensor Fusion(Ultrasonic + TopMaix)
+    robotMonitor.pos_x = topmaixPosData.valid ? topmaixPosData.x : (int8_t)round(usData.coord_x);
+    robotMonitor.pos_y = topmaixPosData.valid ? topmaixPosData.y : (int8_t)round(usData.coord_y);
 }
 
 void sendMotor(float vx, float vy, float rot_v, int target_heading) {
@@ -196,7 +217,7 @@ void sendMotor(float vx, float vy, float rot_v, int target_heading) {
 }
 
 void sendMaincoreData() {
-    uint8_t data[9];
+    uint8_t data[10];
     data[0] = PROTOCAL_HEADER;
     data[1] = robotMonitor.pos_x;
     data[2] = robotMonitor.pos_y;
@@ -205,7 +226,8 @@ void sendMaincoreData() {
     data[5] = robotMonitor.ball_angle>>8; // High byte
     data[6] = robotMonitor.ball_dist;
     data[7] = robotMonitor.ball_dist>>8; // High byte
-    data[8] = PROTOCAL_END;
+    data[8] = robotMonitor.role; // Reserved
+    data[9] = PROTOCAL_END;
     Serial8.write(data, sizeof(data));
 }
 
@@ -271,7 +293,8 @@ bool UI_Interface(){
     }
     return true;
 }
-/*
+
+
 void triggerUS(uint8_t i) {
   digitalWrite(trigPins[i], LOW);
   delayMicroseconds(2);
@@ -280,33 +303,46 @@ void triggerUS(uint8_t i) {
   digitalWrite(trigPins[i], LOW);
 }
 
-void updateUS() {
-    static uint32_t last_trigger_time = 0;
-    uint8_t current_us = 0;
-  if (millis() - last_trigger_time >= 50) {
-    last_trigger_time = millis();
-    current_us = (current_us + 1) % US_COUNT;
-    echo_done[current_us] = false;
-    triggerUS(current_us);
-  }
-
-  for (uint8_t i = 0; i < US_COUNT; i++) {
-    if (!echo_done[i]) continue;
-    noInterrupts();
-    uint32_t dur = echo_duration[i];
-    echo_done[i] = false;
-    interrupts();
-    
-    if (dur > 100 && dur < 12000) {
-      float raw = dur * 0.0343f / 2.0f;
-      us_invalid_count[i] = 0;
-      us_dist_cm[i] = (us_dist_cm[i] < US_INVALID_DISTANCE) ? us_dist_cm[i] * (1.0f - US_FILTER_ALPHA) + raw * US_FILTER_ALPHA: raw;
-    } 
-    else {
-      if (us_invalid_count[i] < US_INVALID_LIMIT) us_invalid_count[i]++;
-      if (us_invalid_count[i] >= US_INVALID_LIMIT) us_dist_cm[i] = US_INVALID_DISTANCE;
-    }
+// 合併 updateFilteredUS + markInvalidUS
+void updateReading(uint8_t i, uint32_t duration) {
+  if (duration > 100 && duration < 15000) {
+    float raw = duration * 0.0343f / 2.0f;
+    usData.dist_cm[i] = isValidUS(usData.dist_cm[i])
+                      ? usData.dist_cm[i] * (1.0f - US_FILTER_ALPHA) + raw * US_FILTER_ALPHA
+                      : raw;
+    usData.invalid_count[i] = 0;
+  } else if (++usData.invalid_count[i] >= US_INVALID_LIMIT) {
+    usData.dist_cm[i] = US_INVALID_DIST;
   }
 }
 
-*/
+void updateUSCoordinate() {
+  usData.coord_x = (isValidUS(usData.dist_cm[US_LEFT]) && isValidUS(usData.dist_cm[US_RIGHT]))
+                     ? (usData.dist_cm[US_LEFT] - usData.dist_cm[US_RIGHT]) / 2.0f : US_INVALID_DIST;
+
+  usData.coord_y = (isValidUS(usData.dist_cm[US_BACK]) && isValidUS(usData.dist_cm[US_FRONT]))
+                     ? (usData.dist_cm[US_BACK] - usData.dist_cm[US_FRONT]) / 2.0f : US_INVALID_DIST;
+}
+
+void updateUS() {
+    static uint8_t  current_us        = US_COUNT - 1;
+    static uint32_t last_trigger_time = 0;
+    if (millis() - last_trigger_time >= 50) {
+        last_trigger_time = millis();
+        current_us = (current_us + 1) % US_COUNT;
+        echo_done[current_us] = false;
+        triggerUS(current_us);
+    }
+
+    for (uint8_t i = 0; i < US_COUNT; i++) {
+        if (!echo_done[i]) continue;
+
+        noInterrupts();
+        uint32_t duration = echo_duration[i];
+        echo_done[i] = false;
+        interrupts();
+
+        updateReading(i, duration);
+        updateUSCoordinate();
+    }
+}

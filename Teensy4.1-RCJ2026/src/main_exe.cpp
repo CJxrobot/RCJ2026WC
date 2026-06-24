@@ -25,6 +25,8 @@ void setup() {
     while(UI_Interface()) {
         ;
     }
+    stopMotors();
+    //while(!digitalRead(COM_O1_PIN)); REMOTE START  
 }
 
 
@@ -33,9 +35,17 @@ unsigned long last_1hz_tick = 0;
 unsigned long last_ball_request_tick = 0; // 新增：非阻塞球資訊請求計時器
 
 void loop() {
-    stopMotors();
-    while(!digitalRead(COM_O1_PIN));
-    while (1) {
-        ;
-    }
+    update_all_sensor();
+    sensor_fusion();
+    Serial.printf("pos_x: %d, pos_y: %d, ball_dist: %d, ball_angle: %d, ball_valid: %d, has_possession: %d, strategy: %d, role: %d\n",
+        robotMonitor.pos_x,
+        robotMonitor.pos_y,
+        robotMonitor.ball_dist,
+        robotMonitor.ball_angle,
+        robotMonitor.ball_valid,
+        robotMonitor.has_possession,
+        robotMonitor.strategy,
+        robotMonitor.role
+    );
+    sendMaincoreData();
 }

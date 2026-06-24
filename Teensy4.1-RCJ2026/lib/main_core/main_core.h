@@ -29,10 +29,12 @@
 #define TRIG_L 5  
 #define ECHO_L 10
 
-#define US_COUNT            4
-#define US_INVALID_DISTANCE 999.0f
-#define US_FILTER_ALPHA     0.35f
-#define US_INVALID_LIMIT    3
+#define US_COUNT         4
+#define US_INVALID_DIST  999.0f
+#define US_FILTER_ALPHA  0.35f
+#define US_INVALID_LIMIT 3
+
+#define alpha 0.15
 
 #define COM_O1_PIN 37
 #define COM_O2_PIN 36
@@ -51,10 +53,19 @@ struct TopMaixPosData {
     uint8_t ball_dist = 0;
 };
 
-struct USSensor {
-    uint16_t dist_b = 0; uint16_t dist_l = 0;
-    uint16_t dist_r = 0; uint16_t dist_f = 0;
-};
+// main_core.h
+typedef struct {
+  float    pos_x_f;
+  float    pos_y_f;
+  float    dist_cm[US_COUNT];
+  uint8_t  invalid_count[US_COUNT];
+  float    coord_x;
+  float    coord_y;
+  uint8_t  current;
+  uint32_t last_trigger_time;
+  uint32_t last_display_time;
+} USData;
+
 
 
 enum class RobotState : uint8_t { STATE_READY, STATE_CALIBRATING, STATE_SAVING };
@@ -75,26 +86,14 @@ struct RobotMonitor {
     uint8_t role = 0; // Uses the custom enum type with a default value
 };
 
-
-enum USIndex   { US_FRONT = 0, US_RIGHT = 1, US_BACK = 2, US_LEFT = 3 };
-
-const uint8_t trigPins[US_COUNT] = { TRIG_F, TRIG_R, TRIG_B, TRIG_L };
-const uint8_t echoPins[US_COUNT] = { ECHO_F, ECHO_R, ECHO_B, ECHO_L };
-
-//volatile uint32_t echo_start[US_COUNT]    = {0};
-//volatile uint32_t echo_duration[US_COUNT] = {0};
-//volatile bool     echo_done[US_COUNT]     = {false};
-
-//float   us_dist_cm[US_COUNT]       = { US_INVALID_DISTANCE, US_INVALID_DISTANCE, US_INVALID_DISTANCE, US_INVALID_DISTANCE };
-
-
 // --- 3. External Variables ---
 // These tell the compiler "The actual memory for these is in main.cpp"
-extern USSensor usData;
+extern USData usData;
 extern RobotMonitor robotMonitor;
 extern RobotMonitor teammateMonitor;
 extern Adafruit_SSD1306 display;
 extern TopMaixPosData topmaixPosData;
+extern USData usData;
 
 // --- Function Prototypes ---
 void main_core_init();
@@ -117,15 +116,31 @@ void ballsensor();
 void sendMaincoreData();
 void readTopMaix();
 void sensor_fusion();
-/*
-void echoISR(uint8_t i) {
-  if (digitalRead(echoPins[i]) == HIGH) echo_start[i] = micros();
-  else { echo_duration[i] = micros() - echo_start[i]; echo_done[i] = true; }
+void updateUS();
+void triggerUS(uint8_t i);
+void updateReading(uint8_t i, uint32_t duration);
+void updateUSCoordinate();
+
+
+enum USIndex   { US_FRONT = 0, US_RIGHT = 1, US_BACK = 2, US_LEFT = 3 };
+
+// main_core.h
+extern volatile uint32_t echo_start[US_COUNT];
+extern volatile uint32_t echo_duration[US_COUNT];
+extern volatile bool     echo_done[US_COUNT];
+const uint8_t trigPins[US_COUNT] = { TRIG_F, TRIG_R, TRIG_B, TRIG_L };
+const uint8_t echoPins[US_COUNT] = { ECHO_F, ECHO_R, ECHO_B, ECHO_L };
+inline bool isValidUS(float d) { return d < US_INVALID_DIST; }
+
+// 用 template 取代 4 個幾乎一樣的 ISR wrapper
+template<uint8_t i>
+void echoISR() {
+  if (digitalRead(echoPins[i]) == HIGH) {
+    echo_start[i] = micros();
+  } else {
+    echo_duration[i] = micros() - echo_start[i];
+    echo_done[i] = true;
+  }
 }
-void echoFrontISR() { echoISR(US_FRONT); }
-void echoRightISR() { echoISR(US_RIGHT); }
-void echoBackISR()  { echoISR(US_BACK);  }
-void echoLeftISR()  { echoISR(US_LEFT);  }
-8
-*/
+
 #endif
