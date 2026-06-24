@@ -20,12 +20,6 @@
 
 // --- Ultrasonic ---
 // Ultrasonic pins
-<<<<<<< HEAD
-#define TRIG_F 2  #define ECHO_F 6
-#define TRIG_R 3  #define ECHO_R 8
-#define TRIG_B 4  #define ECHO_B 9
-#define TRIG_L 5  #define ECHO_L 10
-=======
 #define TRIG_F 2  
 #define ECHO_F 6
 #define TRIG_R 3  
@@ -34,65 +28,51 @@
 #define ECHO_B 9
 #define TRIG_L 5  
 #define ECHO_L 10
->>>>>>> 22e0647 (sync with defense)
 
 #define US_COUNT            4
 #define US_INVALID_DISTANCE 999.0f
 #define US_FILTER_ALPHA     0.35f
 #define US_INVALID_LIMIT    3
 
-
 #define COM_O1_PIN 37
 #define COM_O2_PIN 36
 
-// --- 1. Blueprints (Struct Definitions) ---
-<<<<<<< HEAD
-struct TopMaixData {int16_t x = 0;int16_t y = 0;uint8_t status = 0;bool valid = false;bool ball_found = false;uint16_t ball_angle = 0xFFFF;uint8_t ball_dist = 0;};
-=======
-//struct TopMaixData {int16_t x = 0;int16_t y = 0;uint8_t status = 0;bool valid = false;bool ball_found = false;uint16_t ball_angle = 0xFFFF;uint8_t ball_dist = 0;};
-struct MaixPosData {int16_t x = 0;int16_t y = 0;uint8_t status = 0;bool valid = false;bool ball_found = false;uint16_t ball_angle = 0xFFFF;uint8_t ball_dist = 0;};
+// --- Kicker Constants ---
+#define Charge_Pin 33
+#define Kicker_Pin 32
 
-extern MaixPosData maixPosData;
-
->>>>>>> 22e0647 (sync with defense)
-
-struct BallData {
-    uint16_t dist = 65535; uint16_t angle = 65535;
+struct TopMaixPosData {
+    int16_t x = 0;
+    int16_t y = 0;
+    uint8_t status = 0;
     bool valid = false;
+    bool ball_found = false;
+    uint16_t ball_angle = 0xFFFF;
+    uint8_t ball_dist = 0;
 };
+
 struct USSensor {
     uint16_t dist_b = 0; uint16_t dist_l = 0;
     uint16_t dist_r = 0; uint16_t dist_f = 0;
 };
 
 
-// 1. Define a strongly-typed enum (Scoped Enum)
-// Specifying ': int8_t' forces it to occupy exactly 1 byte, 
-// perfectly replacing your original 'int8_t role' memory size.
-enum class RobotRole : int8_t {
-    DEFAULT = 0,
-    DEFENSE = 1,
-    OFFENSE = 2
-};
-
 enum class RobotState : uint8_t { STATE_READY, STATE_CALIBRATING, STATE_SAVING };
 // 2. Robot state structure
 struct RobotMonitor {
-    RobotRole role = RobotRole::DEFAULT; // Uses the custom enum type with a default value
     RobotState currentState = RobotState::STATE_READY;
-    bool main_valid = false;
     int8_t pos_x = 0;
     int8_t pos_y = 0;
-    int8_t pos_status=0;
-    bool has_possession = false;
     float vx = 0.0f; 
     float vy = 0.0f; 
     float rot_v = 0.0f;
     uint16_t heading = 0; // Target heading in degrees
-    //for teammate data:
     uint16_t ball_dist = 0; // 0-15 (4 bits)
     uint16_t ball_angle = 0; // 0-255 (8 bits)
     bool ball_valid = false;
+    bool has_possession = false;
+    bool strategy = false; // 0 for defense, 1 for offense
+    uint8_t role = 0; // Uses the custom enum type with a default value
 };
 
 
@@ -114,6 +94,8 @@ extern USSensor usData;
 extern RobotMonitor robotMonitor;
 extern RobotMonitor teammateMonitor;
 extern Adafruit_SSD1306 display;
+extern TopMaixPosData topmaixPosData;
+
 // --- Function Prototypes ---
 void main_core_init();
 void drawMessage(const char* msg);
@@ -133,8 +115,8 @@ void triggerUS(uint8_t i);
 void updateUS();
 void ballsensor();
 void sendMaincoreData();
-void readMaix();
-
+void readTopMaix();
+void sensor_fusion();
 /*
 void echoISR(uint8_t i) {
   if (digitalRead(echoPins[i]) == HIGH) echo_start[i] = micros();
