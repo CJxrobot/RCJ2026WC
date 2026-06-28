@@ -249,25 +249,6 @@ void stopMotors() {
 }
 
 
-void sendMaincoreData() {
-    uint8_t data[9];
-    data[0] = PROTOCAL_HEADER;
-    data[1] = robotMonitor.pos_x;
-    data[2] = robotMonitor.pos_y;
-    data[3] = robotMonitor.ball_valid ? 1 : 0;
-    data[4] = robotMonitor.ball_angle;
-    data[5] = robotMonitor.ball_angle>>8; // High byte
-    data[6] = robotMonitor.ball_dist;
-    data[7] = robotMonitor.ball_dist>>8; // High byte
-    data[8] = PROTOCAL_END;
-    Serial8.write(data, sizeof(data));
-}
-
-void stopMotors() {
-    sendMotor(0.0f, 0.0f, 0.0f, 90); // Send zero velocities to stop
-}
-
-
 bool UI_Interface(){
     update_all_sensor();
     static uint32_t lastDisplayTime = 0;
@@ -335,24 +316,6 @@ void triggerUS(uint8_t i) {
   digitalWrite(trigPins[i], LOW);
 }
 
-void updateUS() {
-    static uint32_t last_trigger_time = 0;
-    uint8_t current_us = 0;
-  if (millis() - last_trigger_time >= 50) {
-    last_trigger_time = millis();
-    current_us = (current_us + 1) % US_COUNT;
-    echo_done[current_us] = false;
-    triggerUS(current_us);
-  }
-}
-
-void triggerUS(uint8_t i) {
-  digitalWrite(trigPins[i], LOW);
-  delayMicroseconds(2);
-  digitalWrite(trigPins[i], HIGH);
-  delayMicroseconds(10);
-  digitalWrite(trigPins[i], LOW);
-}
 
 // 合併 updateFilteredUS + markInvalidUS
 void updateReading(uint8_t i, uint32_t duration) {
