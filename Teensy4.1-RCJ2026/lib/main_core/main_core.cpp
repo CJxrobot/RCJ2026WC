@@ -75,6 +75,14 @@ void main_core_init() {
     attachInterrupt(digitalPinToInterrupt(ECHO_B), echoISR<US_BACK>,  CHANGE);
     attachInterrupt(digitalPinToInterrupt(ECHO_L), echoISR<US_LEFT>,  CHANGE);
 
+/*    pinMode(TRIG_F, OUTPUT);
+    pinMode(TRIG_R, OUTPUT);
+    pinMode(TRIG_B, OUTPUT);
+    pinMode(TRIG_L, OUTPUT);
+    pinMode(ECHO_F, INPUT);
+    pinMode(ECHO_R, INPUT);
+    pinMode(ECHO_B, INPUT);
+    pinMode(ECHO_L, INPUT);*/
 }
 
 void drawMessage(const char* msg) {
@@ -182,12 +190,13 @@ void roleSwitchControl() {
 
 void update_all_sensor(){
     ballsensor();
-    readTopMaix();
+    //readTopMaix();
     updateUS();
 }
 
 void sensor_fusion() {
     // Ball Sensor Fusion
+    /*
     if (topmaixPosData.valid && topmaixPosData.ball_found) {
         robotMonitor.ball_valid = true;
         robotMonitor.ball_angle = topmaixPosData.ball_angle;
@@ -196,11 +205,17 @@ void sensor_fusion() {
         robotMonitor.ball_valid = false;
         robotMonitor.ball_angle = 65535; // Invalid angle
         robotMonitor.ball_dist = 255; // Max distance
-    }
+    }*/
 
     // Position Sensor Fusion(Ultrasonic + TopMaix)
-    robotMonitor.pos_x = topmaixPosData.valid ? topmaixPosData.x : (int8_t)round(usData.coord_x);
-    robotMonitor.pos_y = topmaixPosData.valid ? topmaixPosData.y : (int8_t)round(usData.coord_y);
+    robotMonitor.pos_x = (int8_t)round(usData.coord_x);
+    robotMonitor.pos_y = (int8_t)round(usData.coord_y);
+    
+    Serial.printf("US distances: L=%.2f, R=%.2f, F=%.2f, B=%.2f\n", usData.dist_cm[US_LEFT], usData.dist_cm[US_RIGHT], usData.dist_cm[US_FRONT], usData.dist_cm[US_BACK]);
+    Serial.printf("US coord_x: %.2f, coord_y: %.2f\n", usData.coord_x, usData.coord_y);
+    Serial.printf("TopMaix x: %d, y: %d\n", topmaixPosData.x, topmaixPosData.y);
+    Serial.printf("readpos_x: %d, readpos_y: %d\n", topmaixPosData.x, topmaixPosData.y);
+    
 }
 
 void sendMotor(float vx, float vy, float rot_v, int target_heading) {
@@ -237,6 +252,7 @@ void stopMotors() {
 
 
 bool UI_Interface(){
+    update_all_sensor();
     static uint32_t lastDisplayTime = 0;
     switch (robotMonitor.currentState) {
         case RobotState::STATE_READY:
@@ -317,11 +333,48 @@ void updateReading(uint8_t i, uint32_t duration) {
 }
 
 void updateUSCoordinate() {
-  usData.coord_x = (isValidUS(usData.dist_cm[US_LEFT]) && isValidUS(usData.dist_cm[US_RIGHT]))
-                     ? (usData.dist_cm[US_LEFT] - usData.dist_cm[US_RIGHT]) / 2.0f : US_INVALID_DIST;
+    // ==================== X 軸邏輯 (右正, 左負) ====================
+    if (isValidUS(usData.dist_cm[US_LEFT]) && usData.dist_cm[US_LEFT] > 5.0f && usData.dist_cm[US_LEFT] < 30.0f && 
+        (usData.dist_cm[US_LEFT] < usData.dist_cm[US_RIGHT] || !isValidUS(usData.dist_cm[US_RIGHT]))) {
+        // 左邊在 5~30 且比右邊小 -> 採信左邊
+        usData.coord_x = -(91.0f - usData.dist_cm[US_LEFT]); 
+    } 
+    else if (isValidUS(usData.dist_cm[US_RIGHT]) && usData.dist_cm[US_RIGHT] > 5.0f && usData.dist_cm[US_RIGHT] < 30.0f && 
+            (usData.dist_cm[US_RIGHT] < usData.dist_cm[US_LEFT] || !isValidUS(usData.dist_cm[US_LEFT]))) {
+        // 右邊在 5~30 且比左邊小 -> 採信右邊
+        usData.coord_x = 91.0f - usData.dist_cm[US_RIGHT]; 
+    } 
+    else {
+        // 兩邊都大於 30，走原本的相減
+        usData.coord_x = (isValidUS(usData.dist_cm[US_LEFT]) && isValidUS(usData.dist_cm[US_RIGHT]))
+                        ? (usData.dist_cm[US_LEFT] - usData.dist_cm[US_RIGHT]) / 2.0f : US_INVALID_DIST;
+    }
+    // ==================== Y 軸邏輯 (前後總長 243, 半長 121.5) ====================
+    if (isValidUS(usData.dist_cm[US_BACK]) && usData.dist_cm[US_BACK] > 5.0f && usData.dist_cm[US_BACK] < 30.0f && 
+        (!isValidUS(usData.dist_cm[US_FRONT]) || usData.dist_cm[US_FRONT] > 150.0f)) {
+        // 靠近後方，前方很大 -> 車在後半場 (負半場)
+        usData.coord_y = -(121.5f - usData.dist_cm[US_BACK]);
+    } 
+    else if (isValidUS(usData.dist_cm[US_FRONT]) && usData.dist_cm[US_FRONT] > 5.0f && usData.dist_cm[US_FRONT] < 30.0f && 
+            (!isValidUS(usData.dist_cm[US_BACK]) || usData.dist_cm[US_BACK] > 150.0f)) {
+        // 靠近前方，後方很大 -> 車在前半場 (正半場)
+        usData.coord_y = 121.5f - usData.dist_cm[US_FRONT]; 
+    } 
+    else {
+        // 兩邊都正常，維持原來的相減
+        usData.coord_y = (isValidUS(usData.dist_cm[US_BACK]) && isValidUS(usData.dist_cm[US_FRONT]))
+                        ? (usData.dist_cm[US_BACK] - usData.dist_cm[US_FRONT]) / 2.0f : US_INVALID_DIST;
+    }
 
-  usData.coord_y = (isValidUS(usData.dist_cm[US_BACK]) && isValidUS(usData.dist_cm[US_FRONT]))
-                     ? (usData.dist_cm[US_BACK] - usData.dist_cm[US_FRONT]) / 2.0f : US_INVALID_DIST;
+    // ==================== 球門厚度補償 ====================
+    if (usData.coord_x < 30.0f && usData.coord_x > -30.0f) {
+        if (usData.coord_y > 0.0f) {
+            usData.coord_y -= 6.0f;  // y > 0 時，往 0 修正 (減 6)
+        } 
+        else if (usData.coord_y < 0.0f) {
+            usData.coord_y += 6.0f;  // y < 0 時，往 0 修正 (加 6)
+        }
+    }
 }
 
 void updateUS() {
@@ -346,3 +399,25 @@ void updateUS() {
         updateUSCoordinate();
     }
 }
+
+/*
+void updateUS() {
+  static uint8_t  current_us        = US_COUNT - 1;
+  static uint32_t last_trigger_time = 0;
+
+  if (millis() - last_trigger_time >= 20) {
+    last_trigger_time = millis();
+    current_us = (current_us + 1) % US_COUNT;
+
+    digitalWrite(trigPins[current_us], LOW);
+    delayMicroseconds(2);
+    digitalWrite(trigPins[current_us], HIGH);
+    delayMicroseconds(10);
+    digitalWrite(trigPins[current_us], LOW);
+
+    uint32_t duration = pulseIn(echoPins[current_us], HIGH, 30000);
+
+    updateReading(current_us, duration);
+    updateUSCoordinate();
+  }
+}*/

@@ -67,7 +67,7 @@ void readMaincoreData() {
             continue;
         }
         Serial8.readBytes(buffer,  PACKET_SIZE );
-        if (buffer[8] == PROTOCAL_END) {
+        if (buffer[9] == PROTOCAL_END) {
           subMonitor.pos_x = buffer[1];
           subMonitor.pos_y = buffer[2];
           subMonitor.ball_valid = buffer[3] != 0;
@@ -77,6 +77,7 @@ void readMaincoreData() {
         }
     }
 }
+
 void update_line_sensor(){
   lineData.state = 0xFFFFFFFF;
   

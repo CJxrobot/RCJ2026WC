@@ -1,52 +1,40 @@
-#include <main_core.h>
+#include <Arduino.h>
+// Define Pin Connections
+const int trigPin = 5;
+const int echoPin = 10;
 
-// ---- 顯示相關 ----
-void printUSValue(float d) {
-  if (!isValidUS(d)) {
-    display.print(" ---.-");
-    return;
-  }
-  char buf[8];
-  snprintf(buf, sizeof(buf), "%5.1f", d);
-  display.print(buf);
-}
-
-void printCoordValue(float c) {
-  if (isValidUS(c)) display.print((int)round(c));
-  else              display.print("---");
-}
-
-void showUSDistances() {
-    static uint32_t last_display_time = 0;
-    if (millis() - last_display_time < 100) return;
-    last_display_time = millis();
-
-    static const char* labels[US_COUNT] = { "Front:", "Right:", "Back: ", "Left: " };
-    static const uint8_t ys[US_COUNT]    = { 30, 38, 46, 54 };
-
-    display.clearDisplay();
-    display.setTextSize(1);
-    display.setTextColor(SSD1306_WHITE);
-
-    display.setCursor(0, 22);
-    display.print("X:"); printCoordValue(usData.coord_x);
-    display.print(" Y:"); printCoordValue(usData.coord_y);
-
-    for (uint8_t i = 0; i < US_COUNT; i++) {
-        display.setCursor(0, ys[i]);
-        display.print(labels[i]);
-        printUSValue(usData.dist_cm[i]);
-        display.print(" cm");
-    }
-
-    display.display();
-}
+// Variables for duration and distance
+long duration;
+int distanceCm;
 
 void setup() {
-    main_core_init();
-  }
+  Serial.begin(9600); // Start serial communication at 9600 baud
+  pinMode(trigPin, OUTPUT);
+  pinMode(echoPin, INPUT);
+}
 
 void loop() {
-  updateUS();
-  showUSDistances();
+  // 1. Clear the trigPin by setting it LOW for 2 microseconds
+  digitalWrite(trigPin, LOW);
+  delayMicroseconds(2);
+
+  // 2. Send a 10-microsecond pulse to trigger the sensor
+  digitalWrite(trigPin, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(trigPin, LOW);
+
+  // 3. Read the echoPin, returning the sound wave travel time in microseconds
+  duration = pulseIn(echoPin, HIGH);
+
+  // 4. Calculate the distance (Speed of sound is ~0.034 cm/us, divide by 2 for round trip)
+  distanceCm = duration * 0.034 / 2;
+
+  // 5. Print the distance to the Serial Monitor
+  Serial.print("Distance: ");
+  Serial.print(distanceCm);
+  Serial.println(" cm");
+
+  // Wait 500ms before taking the next reading
+  delay(500);
 }
+
