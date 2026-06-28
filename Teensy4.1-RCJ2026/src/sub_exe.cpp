@@ -1,6 +1,5 @@
 #include "sub_core.h"
 
-
 #define DtoR_const 0.0174529f
 
 uint8_t role = 0; // 0: default, 1: defense, 2: offense
@@ -32,7 +31,6 @@ void setup() {
     }
     digitalWrite(LED_BUILTIN, LOW); // Indicate setup complete
 }
-
 float get_line_move_deg(int8_t range, uint32_t line_state, uint8_t center) {
     float x_sum = 0, y_sum = 0;
     int cnt = 0;
