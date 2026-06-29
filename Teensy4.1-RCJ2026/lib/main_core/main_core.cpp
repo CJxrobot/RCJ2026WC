@@ -524,7 +524,7 @@ void sensor_fusion() {
         robotMonitor.ball_angle = topmaixPosData.ball_angle;
         robotMonitor.ball_dist  = topmaixPosData.ball_dist;
     } else {
-        ;
+        ;   
         //robotMonitor.ball_valid = false;
         //robotMonitor.ball_angle = 65535;  // sentinel: no angle
         //robotMonitor.ball_dist  = 255;    // sentinel: max distance
