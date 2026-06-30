@@ -6,7 +6,7 @@ void setup() {
     Serial.begin(9600);
 
     // Attach ESC to pin 9
-    ESC.attach(41,1000,2000);
+    ESC.attach(A17,1000,2000);
 
     // Start at minimum throttle
     Serial.println("Initializing ESC...");
