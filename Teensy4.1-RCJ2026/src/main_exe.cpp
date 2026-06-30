@@ -60,6 +60,7 @@ void loop() {
         robotMonitor.strategy,
         robotMonitor.role
     );
+    /*執行踢球*/
     if(digitalRead(EAT_BALL_IR_PIN) == 0){
         if(usData.dist_cm[US_FRONT] > 30){
             kicker_control(1);
