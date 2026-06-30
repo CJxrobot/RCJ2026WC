@@ -70,6 +70,8 @@ void main_core_init() {
         digitalWrite(trigPins[i], LOW);
     }
 
+    pinMode(EAT_BALL_IR_PIN, INPUT);
+
     attachInterrupt(digitalPinToInterrupt(ECHO_F), echoISR<US_FRONT>, CHANGE);
     attachInterrupt(digitalPinToInterrupt(ECHO_R), echoISR<US_RIGHT>, CHANGE);
     attachInterrupt(digitalPinToInterrupt(ECHO_B), echoISR<US_BACK>,  CHANGE);
@@ -112,6 +114,7 @@ void ballsensor() {
   robotMonitor.ball_angle = angle;
   robotMonitor.ball_dist = dist;
 }
+
 void kicker_control(bool kick) {
     static uint32_t charge_start_time = 0;
     static bool is_charged = false;
@@ -123,7 +126,7 @@ void kicker_control(bool kick) {
     // 1. Kick Logic (Priority)
     if (kick && is_charged) {
         digitalWrite(Kicker_Pin, HIGH);
-        delay(15); // Solenoid pulse
+        delay(10); // Solenoid pulse
         digitalWrite(Kicker_Pin, LOW);
         
         is_charged = false; 
@@ -151,6 +154,52 @@ void kicker_control(bool kick) {
         }
     }
 }
+/*
+void kicker_control(bool kick) {
+    static uint32_t charge_start_time = 0;
+    static bool is_charged = false;
+    static bool is_charging = false;
+
+    const uint32_t CHARGE_MS = 5000;
+    uint32_t now = millis();
+
+    // 1. Kick Logic (Priority)
+    if (kick && is_charged) {
+        digitalWrite(Kicker_Pin, HIGH);
+        delay(15);
+        digitalWrite(Kicker_Pin, LOW);
+
+        analogWrite(Charge_Pin, 0);  // Make sure charge PWM is off
+        is_charged = false;
+        is_charging = false;
+        Serial.println("KICKED");
+        return;
+    }
+
+    // 2. Start new charge cycle
+    if (!is_charged && !is_charging) {
+        charge_start_time = now;
+        is_charging = true;
+        Serial.println("CHARGING...");
+    }
+
+    // 3. PWM ramp during charging
+    if (is_charging) {
+        uint32_t elapsed = now - charge_start_time;
+
+        if (elapsed >= CHARGE_MS) {
+            // Fully charged
+            analogWrite(Charge_Pin, 255);
+            is_charging = false;
+            is_charged = true;
+            Serial.println("READY TO KICK");
+        } else {
+            // Ramp 0 → 255 over CHARGE_MS
+            uint8_t duty = (uint8_t)((elapsed * 255UL) / CHARGE_MS);
+            analogWrite(Charge_Pin, duty);
+        }
+    }
+}*/
 
 void readTopMaix() {
   uint8_t buffer[10];

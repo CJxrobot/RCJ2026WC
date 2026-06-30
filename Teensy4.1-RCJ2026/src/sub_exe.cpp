@@ -221,7 +221,6 @@ void defense_mode3(){
   update_gyro_sensor();
   update_line_sensor();
   readMaincoreData();
-
   int count = 0;
   float x_sum = 0, y_sum = 0;
   const float deg2rad = M_PI / 180.0f;
@@ -425,7 +424,7 @@ void loop(){
         Serial.println("Starting line sensor calibration...");
           uint16_t max_ls[32], min_ls[32];
           uint16_t front_max = 0, front_min = 4095;
-          uint16_t mid_max = 0, mid_min = 4095;
+          //uint16_t mid_max = 0, mid_min = 4095;
           for (int i = 0; i < 32; i++) { 
             max_ls[i] = 0; 
             min_ls[i] = 4095; 

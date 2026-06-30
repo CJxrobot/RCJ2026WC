@@ -42,7 +42,7 @@
 // --- Kicker Constants ---
 #define Charge_Pin 33
 #define Kicker_Pin 32
-
+#define EAT_BALL_IR_PIN A16
 struct TopMaixPosData {
     int16_t x = 0;
     int16_t y = 0;

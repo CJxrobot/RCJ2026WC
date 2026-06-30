@@ -60,4 +60,12 @@ void loop() {
         robotMonitor.strategy,
         robotMonitor.role
     );
+    if(digitalRead(EAT_BALL_IR_PIN) == 0){
+        if(usData.dist_cm[US_FRONT] > 30){
+            kicker_control(1);
+        }
+        else{
+            kicker_control(0);
+        } 
+    }
 }
